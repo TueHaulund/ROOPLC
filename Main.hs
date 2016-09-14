@@ -2,6 +2,7 @@ module Main where
 
 import AST
 import Parser
+import PISA
 --import ClassAnalyzer
 --import ScopeAnalyzer
 
