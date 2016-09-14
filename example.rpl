@@ -1,0 +1,34 @@
+class Foo
+    method run(int a)
+        skip
+
+class Bar inherits Foo
+    int b
+
+    method run(int a)
+        b += 6
+        a += b
+        b -= 6
+
+class Baz inherits Foo
+    int c
+
+    method run(int a)
+        c += 5
+        a -= c
+        c -= 5
+
+class Program
+    int result
+
+    method main()
+        construct Bar bar
+        construct Baz baz
+        call go(bar)
+        uncall go(baz)
+        destruct baz
+        destruct bar
+
+    method go(Foo f)
+        result += 1
+        call f::run(result)
