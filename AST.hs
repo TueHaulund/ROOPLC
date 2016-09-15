@@ -1,6 +1,5 @@
 module AST where
 
-import Data.Map
 import Text.Show.Pretty
 
 {-- AST Primitives --}
@@ -84,19 +83,26 @@ type MethodDeclaration = GMDecl Identifier
 type ClassDeclaration = GCDecl Identifier
 type Program = GProg Identifier
 
---Scope-annotated AST
+--Proceduralized AST
+type PProgram = [(TypeName, GMDecl Identifier)]
+
+--Scoped AST
 type SIdentifier = Integer
 type SExpression = GExpr SIdentifier
 type SStatement = GStmt SIdentifier
 type SVariableDeclaration = GDecl SIdentifier
 type SMethodDeclaration = GMDecl SIdentifier
-type SClassDeclaration = GCDecl SIdentifier
-type SProgram = GProg SIdentifier
+type SProgram = [(TypeName, GMDecl SIdentifier)]
 
 {-- Other Definitions --}
 
-type SymbolTable = Map SIdentifier VariableDeclaration
-type Scope = Map Identifier SIdentifier
+data VariableType = LocalVariable DataType Identifier
+                  | ClassVariable DataType Identifier TypeName
+                  | MethodParameter DataType Identifier
+    deriving (Show, Eq)
+
+type SymbolTable = [(SIdentifier, VariableType)]
+type Scope = [(Identifier, SIdentifier)]
 
 printAST :: (Show t) => t -> String
 printAST = ppShow

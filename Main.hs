@@ -16,7 +16,7 @@ main =
            Left err -> print err
            Right xs -> case classAnalysis xs of
                            Left err -> print err
-                           Right xs' -> putStr $ printAST $ fst xs'
+                           Right xs' -> putStr $ show $ snd xs'
                --        case scopeAnalysis xs' of
                --            Left err -> print err
                --            Right xs'' -> putStr $ printAST $ fst xs''
