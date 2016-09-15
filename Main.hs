@@ -3,7 +3,7 @@ module Main where
 import AST
 import Parser
 import PISA
---import ClassAnalyzer
+import ClassAnalyzer
 --import ScopeAnalyzer
 
 import qualified Data.ByteString as Str
@@ -14,10 +14,9 @@ main =
     do input <- Str.readFile "example.rpl"
        case parseString $ C.unpack input of
            Left err -> print err
-           Right xs -> putStr $ printAST xs
-               --case classAnalysis xs of
-               --    Left err -> print err
-               --    Right xs' ->
+           Right xs -> case classAnalysis xs of
+                           Left err -> print err
+                           Right xs' -> putStr $ printAST $ fst xs'
                --        case scopeAnalysis xs' of
                --            Left err -> print err
                --            Right xs'' -> putStr $ printAST $ fst xs''
