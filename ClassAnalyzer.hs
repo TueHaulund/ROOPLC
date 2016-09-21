@@ -2,11 +2,11 @@
 
 module ClassAnalyzer (classAnalysis, CAState(..)) where
 
+import Data.Maybe
+
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
-
-import Data.Maybe
 
 import AST
 

@@ -4,7 +4,7 @@ import AST
 import Parser
 import PISA
 import ClassAnalyzer
---import ScopeAnalyzer
+import ScopeAnalyzer
 
 import qualified Data.ByteString as Str
 import qualified Data.ByteString.Char8 as C
@@ -16,7 +16,6 @@ main =
            Left err -> print err
            Right xs -> case classAnalysis xs of
                            Left err -> print err
-                           Right xs' -> putStr $ show $ snd xs'
-               --        case scopeAnalysis xs' of
-               --            Left err -> print err
-               --            Right xs'' -> putStr $ printAST $ fst xs''
+                           Right xs' -> case scopeAnalysis xs' of
+                                            Left err -> print err
+                                            Right xs'' -> putStr $ printAST $ fst xs''

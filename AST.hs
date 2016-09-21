@@ -97,7 +97,7 @@ type SProgram = [(TypeName, GMDecl SIdentifier)]
 {-- Other Definitions --}
 
 data VariableType = LocalVariable DataType Identifier
-                  | ClassVariable DataType Identifier TypeName
+                  | ClassField DataType Identifier TypeName
                   | MethodParameter DataType Identifier
     deriving (Show, Eq)
 
