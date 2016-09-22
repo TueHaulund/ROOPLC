@@ -3,6 +3,7 @@
 module ClassAnalyzer (classAnalysis, CAState(..)) where
 
 import Data.Maybe
+import Data.List
 
 import Control.Monad
 import Control.Monad.State
@@ -12,28 +13,29 @@ import AST
 
 data CAState =
     CAState {
-        classes :: [TypeName],
-        inherits :: [(TypeName, Maybe TypeName)],
-        fields :: [(TypeName, [VariableDeclaration])],
-        methods :: [(TypeName, [MethodDeclaration])],
+        classes :: [(TypeName, ClassDeclaration)],
+        superClass :: [(TypeName, Maybe TypeName)],
+        subClasses:: [(TypeName, [TypeName])],
+        classFields :: [(TypeName, [VariableDeclaration])],
+        classMethods :: [(TypeName, [MethodDeclaration])],
         mainClass :: Maybe TypeName
     } deriving (Show, Eq)
 
 newtype ClassAnalyzer a = ClassAnalyzer { runCA :: StateT CAState (Except String) a }
     deriving (Functor, Applicative, Monad, MonadState CAState, MonadError String)
 
-checkDuplicateClasses :: TypeName -> ClassAnalyzer ()
-checkDuplicateClasses n =
+checkDuplicateClasses :: (TypeName, ClassDeclaration) -> ClassAnalyzer ()
+checkDuplicateClasses (n, _) =
     do cs <- gets classes
        when (count cs > 1) (throwError $ "Multiple definitions of class " ++ n)
-    where count = length . filter (== n)
+    where count = length . filter ((== n) . fst)
 
 checkBaseClass :: (TypeName, Maybe TypeName) -> ClassAnalyzer ()
 checkBaseClass (_, Nothing) = return ()
 checkBaseClass (n, Just n') =
     do when (n == n') (throwError $ "Class " ++ n ++ " cannot inherit from itself")
        cs <- gets classes
-       when (n' `notElem` cs) (throwError $ "Class " ++ n ++ " cannot inherit from unknown class " ++ n')
+       when (isNothing $ lookup n' cs) (throwError $ "Class " ++ n ++ " cannot inherit from unknown class " ++ n')
 
 checkDuplicateFields :: (TypeName, [VariableDeclaration]) -> ClassAnalyzer ()
 checkDuplicateFields (n, fs) = mapM_ (checkField n fs) fs
@@ -62,8 +64,8 @@ checkInheritance n (Just b) visited =
        checkInheritance n next (b : visited)
 
 getBase :: TypeName -> ClassAnalyzer (Maybe TypeName)
-getBase n = gets inherits >>= \is ->
-    case lookup n is of
+getBase n = gets superClass >>= \sc ->
+    case lookup n sc of
         (Just b) -> return b
         Nothing -> throwError $ "ICE: Unknown class " ++ n
 
@@ -78,30 +80,38 @@ checkMainMethod :: ClassAnalyzer ()
 checkMainMethod = gets mainClass >>= \mc -> when (isNothing mc) (throwError "No main method defined")
 
 initialState :: CAState
-initialState = CAState { classes = [], inherits = [], fields = [], methods = [], mainClass = Nothing }
+initialState = CAState { classes = [], superClass = [], subClasses = [], classFields = [], classMethods = [], mainClass = Nothing }
 
-insertClass :: ClassDeclaration -> ClassAnalyzer ()
-insertClass (GCDecl n b fs ms) = modify $ \s ->
-    s { classes = n : classes s,
-        inherits = (n, b) : inherits s,
-        fields = (n, fs) : fields s,
-        methods = (n, ms) : methods s }
+setSubClasses :: ClassDeclaration -> ClassAnalyzer ()
+setSubClasses (GCDecl _ Nothing _ _) = return ()
+setSubClasses (GCDecl n (Just b) _ _) = gets subClasses >>= \sc ->
+    case lookup b sc of
+        Nothing -> throwError $ "ICE: Unknown class " ++ b
+        (Just ss) -> modify $ \s -> s { subClasses = (b, n : ss) : delete (b, ss) sc }
 
-caClass :: ClassDeclaration -> ClassAnalyzer PProgram
-caClass c@(GCDecl n _ _ ms) = insertClass c >> return (zip (repeat n) ms)
+caClass :: ClassDeclaration -> ClassAnalyzer ()
+caClass c@(GCDecl n b fs ms) = modify $ \s ->
+    s { classes = (n, c) : classes s,
+        superClass = (n, b) : superClass s,
+        subClasses = (n, []) : subClasses s,
+        classFields = (n, fs) : classFields s,
+        classMethods = (n, ms) : classMethods s }
 
-caProgram :: Program -> ClassAnalyzer PProgram
+caProgram :: Program -> ClassAnalyzer Program
 caProgram (GProg p) =
-    do r <- concat <$> mapM caClass p
+    do mapM_ caClass p
+       mapM_ setSubClasses p
        s <- get
        mapM_ checkDuplicateClasses $ classes s
-       mapM_ checkBaseClass $ inherits s
-       mapM_ checkDuplicateFields $ fields s
-       mapM_ checkDuplicateMethods $ methods s
-       mapM_ checkCyclicInheritance $ inherits s
-       mapM_ setMainClass $ methods s
+       mapM_ checkBaseClass $ superClass s
+       mapM_ checkDuplicateFields $ classFields s
+       mapM_ checkDuplicateMethods $ classMethods s
+       mapM_ checkCyclicInheritance $ superClass s
+       mapM_ setMainClass $ classMethods s
        checkMainMethod
-       return r
+       return $ GProg $ filter noBase p
+    where noBase (GCDecl _ Nothing _ _) = True
+          noBase _ = False
 
-classAnalysis :: Program -> Either String (PProgram, CAState)
+classAnalysis :: Program -> Either String (Program, CAState)
 classAnalysis p = runExcept $ runStateT (runCA $ caProgram p) initialState

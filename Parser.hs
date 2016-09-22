@@ -185,10 +185,12 @@ localBlock =
     >> reserved "int"
     >> LocalBlock
     <$> identifier
+    <* symbol "="
     <*> expression
     <*> block
     <* reserved "delocal"
     <* identifier
+    <* symbol "="
     <*> expression
 
 objectBlock :: Parser Statement

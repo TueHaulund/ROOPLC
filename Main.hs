@@ -14,8 +14,8 @@ main =
     do input <- Str.readFile "example.rpl"
        case parseString $ C.unpack input of
            Left err -> print err
-           Right xs -> case classAnalysis xs of
-                           Left err -> print err
-                           Right xs' -> case scopeAnalysis xs' of
-                                            Left err -> print err
-                                            Right xs'' -> putStr $ printAST $ fst xs''
+           Right p -> case classAnalysis p of
+                           Left err -> putStr err
+                           Right p' -> case scopeAnalysis p' of
+                                           Left err -> putStr err
+                                           Right (p'', s) -> putStr $ printAST p''

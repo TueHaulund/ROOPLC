@@ -13,7 +13,7 @@ import ClassAnalyzer
 
 data SAState =
     SAState {
-        variableIndex :: SIdentifier,
+        symbolIndex :: SIdentifier,
         symbolTable :: SymbolTable,
         scopeStack :: [Scope],
         caState :: CAState
@@ -23,7 +23,7 @@ newtype ScopeAnalyzer a = ScopeAnalyzer { runSA :: StateT SAState (Except String
     deriving (Functor, Applicative, Monad, MonadState SAState, MonadError String)
 
 initialState :: CAState -> SAState
-initialState s = SAState { variableIndex = 0, symbolTable = [], scopeStack = [], caState = s }
+initialState s = SAState { symbolIndex = 0, symbolTable = [], scopeStack = [], caState = s }
 
 enterScope :: ScopeAnalyzer ()
 enterScope = modify $ \s -> s { scopeStack = [] : scopeStack s }
@@ -38,44 +38,24 @@ topScope = gets scopeStack >>= \ss ->
         [] -> throwError "ICE: Empty scope stack"
 
 addToScope :: (Identifier, SIdentifier) -> ScopeAnalyzer ()
-addToScope b = do ts <- topScope
-                  modify $ \s -> s { scopeStack = (b : ts) : scopeStack s }
-
-registerSymbol :: VariableType -> Identifier -> ScopeAnalyzer SIdentifier
-registerSymbol vt n =
+addToScope b =
     do ts <- topScope
-       when (isJust $ lookup n ts) (throwError $ "Redeclaration of variable: " ++ n)
-       i <- gets variableIndex
-       modify $ \s -> s { symbolTable = (i, vt) : symbolTable s, variableIndex = 1 + i }
+       modify $ \s -> s { scopeStack = (b : ts) : scopeStack s }
+
+saInsert :: Symbol -> Identifier -> ScopeAnalyzer SIdentifier
+saInsert sym n =
+    do ts <- topScope
+       when (isJust $ lookup n ts) (throwError $ "Redeclaration of symbol: " ++ n)
+       i <- gets symbolIndex
+       modify $ \s -> s { symbolTable = (i, sym) : symbolTable s, symbolIndex = 1 + i }
        addToScope (n, i)
        return i
 
 saLookup :: Identifier -> ScopeAnalyzer SIdentifier
 saLookup n = gets scopeStack >>= \ss ->
     case listToMaybe $ mapMaybe (lookup n) ss of
-        Nothing -> throwError $ "Undeclared variable: " ++ n
+        Nothing -> throwError $ "Undeclared symbol: " ++ n
         Just i -> return i
-
-getBaseClass :: TypeName -> ScopeAnalyzer (Maybe TypeName)
-getBaseClass t = do bs <- gets $ inherits . caState
-                    case lookup t bs of
-                        Nothing -> throwError $ "ICE: Unknown class " ++ t
-                        (Just b) -> return b
-
-getOwnFields :: TypeName -> ScopeAnalyzer [VariableDeclaration]
-getOwnFields t = do fs <- gets $ fields . caState
-                    case lookup t fs of
-                        Nothing -> throwError $ "ICE: Unknown class " ++ t
-                        (Just f) -> return f
-
-getClassFields :: TypeName -> ScopeAnalyzer [VariableDeclaration]
-getClassFields t = do bs <- getBaseClass t
-                      fs <- getOwnFields t
-                      case bs of
-                          Nothing -> return fs
-                          (Just b) -> getClassFields b >>= inheritedFields fs
-    where inheritedFields fs fs' = return $ unionBy compareFields fs fs'
-          compareFields (GDecl _ n1) (GDecl _ n2) = n1 == n2
 
 saExpression :: Expression -> ScopeAnalyzer SExpression
 saExpression (Constant v) = pure $ Constant v
@@ -117,7 +97,7 @@ saStatement s =
 
         (ObjectBlock tp n stmt) ->
             do enterScope
-               n' <- registerSymbol (LocalVariable (ObjectType tp) n) n
+               n' <- saInsert (LocalVariable (ObjectType tp) n) n
                stmt' <- mapM saStatement stmt
                leaveScope
                return $ ObjectBlock tp n' stmt'
@@ -125,7 +105,7 @@ saStatement s =
         (LocalBlock n e1 stmt e2) ->
             do e1' <- saExpression e1
                enterScope
-               n' <- registerSymbol (LocalVariable IntegerType n) n
+               n' <- saInsert (LocalVariable IntegerType n) n
                stmt' <- mapM saStatement stmt
                leaveScope
                e2' <- saExpression e2
@@ -133,12 +113,12 @@ saStatement s =
 
         (LocalCall m args) ->
             LocalCall
-            <$> pure m
+            <$> saLookup m
             <*> localCall m args
 
         (LocalUncall m args) ->
             LocalUncall
-            <$> pure m
+            <$> saLookup m
             <*> localCall m args
 
         (ObjectCall o m args) ->
@@ -176,20 +156,38 @@ saStatement s =
 
 saMethod :: (TypeName, MethodDeclaration) -> ScopeAnalyzer (TypeName, SMethodDeclaration)
 saMethod (t, GMDecl m ps body) =
-    do enterScope
-       fs <- getClassFields t
-       mapM_ registerCF fs
+    do m' <- saLookup m
        enterScope
-       ps' <- mapM registerMP ps
+       ps' <- mapM insertMethodParameter ps
        body' <- mapM saStatement body
        leaveScope
+       return (t, GMDecl m' ps' body')
+    where insertMethodParameter (GDecl tp n) = GDecl tp <$> saInsert (MethodParameter tp n) n
+
+getSubClasses :: TypeName -> ScopeAnalyzer [ClassDeclaration]
+getSubClasses n =
+    do cs <- gets $ classes . caState
+       sc <- gets $ subClasses . caState
+       case lookup n sc of
+           Nothing -> throwError $ "ICE: Unknown class " ++ n
+           (Just sc') -> return $ mapMaybe (rlookup cs) sc'
+    where rlookup = flip lookup
+
+saClass :: ClassDeclaration -> ScopeAnalyzer [(TypeName, SMethodDeclaration)]
+saClass (GCDecl c _ fs ms) =
+    do enterScope
+       mapM_ insertClassField fs
+       mapM_ insertMethod ms
+       sc <- getSubClasses c
+       ms' <- concat <$> mapM saClass sc
+       ms'' <- mapM saMethod $ zip (repeat c) ms
        leaveScope
-       return (t, GMDecl m ps' body')
-    where registerCF (GDecl tp n) = registerSymbol (ClassField tp n t) n
-          registerMP (GDecl tp n) = GDecl tp <$> registerSymbol (MethodParameter tp n) n
+       return $ ms' ++ ms''
+    where insertClassField (GDecl tp n) = saInsert (ClassField tp n c) n
+          insertMethod (GMDecl n _ _) = saInsert (Method n) n
 
-saProgram :: PProgram -> ScopeAnalyzer SProgram
-saProgram = mapM saMethod
+saProgram :: Program -> ScopeAnalyzer SProgram
+saProgram (GProg cs) = concat <$> mapM saClass cs
 
-scopeAnalysis :: (PProgram, CAState) -> Either String (SProgram, SAState)
+scopeAnalysis :: (Program, CAState) -> Either String (SProgram, SAState)
 scopeAnalysis (p, s) = runExcept $ runStateT (runSA $ saProgram p) $ initialState s
