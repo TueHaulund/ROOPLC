@@ -5,6 +5,7 @@ import Parser
 import PISA
 import ClassAnalyzer
 import ScopeAnalyzer
+import TypeChecker
 
 import qualified Data.ByteString as Str
 import qualified Data.ByteString.Char8 as C
@@ -18,4 +19,6 @@ main =
                            Left err -> putStr err
                            Right p' -> case scopeAnalysis p' of
                                            Left err -> putStr err
-                                           Right p'' -> putStr $ printAST $ fst p''
+                                           Right p'' -> case typeCheck p'' of
+                                                            Left err -> putStr err
+                                                            Right _ -> putStr $ printAST $ fst p''
