@@ -18,4 +18,4 @@ main =
                            Left err -> putStr err
                            Right p' -> case scopeAnalysis p' of
                                            Left err -> putStr err
-                                           Right (p'', s) -> putStr $ printAST p''
+                                           Right p'' -> putStr $ printAST $ fst p''

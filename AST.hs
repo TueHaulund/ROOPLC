@@ -106,7 +106,7 @@ type SProgram = [(TypeName, GMDecl SIdentifier SIdentifier)]
 data Symbol = LocalVariable DataType Identifier
             | ClassField DataType Identifier TypeName
             | MethodParameter DataType Identifier
-            | Method Identifier
+            | Method [DataType] Identifier
     deriving (Show, Eq)
 
 type SymbolTable = [(SIdentifier, Symbol)]

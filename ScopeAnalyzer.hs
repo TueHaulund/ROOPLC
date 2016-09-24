@@ -184,7 +184,8 @@ saClass (GCDecl c _ fs ms) =
        leaveScope
        return $ ms' ++ ms''
     where insertClassField (GDecl tp n) = saInsert (ClassField tp n c) n
-          insertMethod (GMDecl n _ _) = saInsert (Method n) n
+          insertMethod (GMDecl n ps _) = saInsert (Method (map getType ps) n) n
+          getType (GDecl tp _) = tp
 
 saProgram :: Program -> ScopeAnalyzer SProgram
 saProgram (GProg cs) = concat <$> mapM saClass cs
