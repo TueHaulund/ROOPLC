@@ -147,8 +147,8 @@ tcMethod (_, GMDecl i (_:_) body) = getMethodName i >>= \n ->
     when (n == "main") (throwError "Method main has invalid signature")
     >> mapM_ tcStatement body
 
-tcProgram :: SProgram -> TypeChecker ()
-tcProgram = mapM_ tcMethod
+tcProgram :: SProgram -> TypeChecker (SProgram, SAState)
+tcProgram p = (,) p <$> (mapM_ tcMethod p >> ask)
 
-typeCheck :: (SProgram, SAState) -> Either String ()
+typeCheck :: (SProgram, SAState) -> Either String (SProgram, SAState)
 typeCheck (p, s) = runExcept $ runReaderT (runTC $ tcProgram p) s

@@ -64,8 +64,8 @@ data Macro = Immediate Integer
 type MInstruction = GInstr Macro
 type MProgram = GProg Macro
 
-invertInstructions :: MProgram -> MProgram
-invertInstructions (GProg p) = GProg $ reverse . map (second invertInstruction) $ p
+invertInstructions :: [(Maybe Label, MInstruction)] -> [(Maybe Label, MInstruction)]
+invertInstructions = reverse . map (second invertInstruction)
     where invertInstruction (ADD r1 r2) = SUB r1 r2
           invertInstruction (SUB r1 r2) = ADD r1 r2
           invertInstruction (ADDI r i) = SUBI r i
