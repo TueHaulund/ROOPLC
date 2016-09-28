@@ -3,6 +3,7 @@
 module MacroExpander (expandMacros) where
 
 import Data.Maybe
+import Data.List
 
 import Control.Monad.Reader
 import Control.Monad.Except
@@ -18,14 +19,15 @@ type Address = Integer
 data MEState =
     MEState {
         addressTable :: [(Label, Address)],
-        sizeTable :: [(TypeName, Size)]
+        sizeTable :: [(TypeName, Size)],
+        programSize :: Size
     } deriving (Show, Eq)
 
 newtype MacroExpander a = MacroExpander { runME :: ReaderT MEState (Except String) a }
     deriving (Functor, Applicative, Monad, MonadReader MEState, MonadError String)
 
 initialState :: MProgram -> CAState -> MEState
-initialState (GProg p) s = MEState { addressTable = mapMaybe toPair $ zip [0..] p, sizeTable = classSize s }
+initialState (GProg p) s = MEState { addressTable = mapMaybe toPair $ zip [0..] p, sizeTable = classSize s, programSize = genericLength p }
     where toPair (a, (Just l, _)) = Just (l, a)
           toPair _ = Nothing
 
@@ -45,6 +47,7 @@ meMacro :: Macro -> MacroExpander Integer
 meMacro (Immediate i) = return i
 meMacro (AddressMacro l) = getAddress l
 meMacro (SizeMacro tn) = getSize tn
+meMacro ProgramSize = asks programSize
 
 meInstruction :: MInstruction -> MacroExpander Instruction
 meInstruction (ADD r1 r2) = return $ ADD r1 r2

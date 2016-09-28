@@ -58,6 +58,7 @@ data GProg i = GProg [(Maybe Label, GInstr i)]
 data Macro = Immediate Integer
            | AddressMacro Label
            | SizeMacro TypeName
+           | ProgramSize
     deriving (Show, Eq)
 
 type MInstruction = GInstr Macro
