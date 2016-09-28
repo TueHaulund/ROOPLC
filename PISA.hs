@@ -1,53 +1,84 @@
+{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+
 module PISA where
 
 import Data.List (intercalate)
+import Control.Arrow
 
-type Immediate = Integer
+import AST (TypeName)
+
 type Label = String
 
 data Register = Reg Integer
     deriving (Eq)
 
-data Offset = Lbl Label | Imm Immediate
-    deriving (Show, Eq)
+{-- Generic PISA Definitions --}
 
-data Instruction = ADD Register Register
-                 | ADDI Register Immediate
-                 | ANDX Register Register Register
-                 | ANDIX Register Register Immediate
-                 | NORX Register Register Register
-                 | NEG Register
-                 | ORX Register Register Register
-                 | ORIX Register Register Immediate
-                 | RL Register Immediate
-                 | RLV Register Register
-                 | RR Register Immediate
-                 | RRV Register Register
-                 | SLLX Register Register Immediate
-                 | SLLVX Register Register Register
-                 | SRAX Register Register Immediate
-                 | SRAVX Register Register Register
-                 | SRLX Register Register Immediate
-                 | SRLVX Register Register Register
-                 | SUB Register Register
-                 | XOR Register Register
-                 | XORI Register Immediate
-                 | BEQ Register Register Offset
-                 | BGEZ Register Offset
-                 | BGTZ Register Offset
-                 | BLEZ Register Offset
-                 | BLTZ Register Offset
-                 | BNE Register Register Offset
-                 | BRA Offset
-                 | EXCH Register Register
-                 | SWAPBR Register
-                 | RBRA Offset
-                 | START
-                 | FINISH
-                 | DATA Immediate
+data GInstr i = ADD Register Register
+              | ADDI Register i
+              | ANDX Register Register Register
+              | ANDIX Register Register i
+              | NORX Register Register Register
+              | NEG Register
+              | ORX Register Register Register
+              | ORIX Register Register i
+              | RL Register i
+              | RLV Register Register
+              | RR Register i
+              | RRV Register Register
+              | SLLX Register Register i
+              | SLLVX Register Register Register
+              | SRAX Register Register i
+              | SRAVX Register Register Register
+              | SRLX Register Register i
+              | SRLVX Register Register Register
+              | SUB Register Register
+              | XOR Register Register
+              | XORI Register i
+              | BEQ Register Register Label
+              | BGEZ Register Label
+              | BGTZ Register Label
+              | BLEZ Register Label
+              | BLTZ Register Label
+              | BNE Register Register Label
+              | BRA Label
+              | EXCH Register Register
+              | SWAPBR Register
+              | RBRA Label
+              | START
+              | FINISH
+              | DATA i
+              | SUBI Register i --Pseudo
     deriving (Eq)
 
-type Program = [(Maybe Label, Instruction)]
+data GProg i = GProg [(Maybe Label, GInstr i)]
+
+{-- Macro PISA Definitions --}
+
+data Macro = Immediate Integer
+           | AddressMacro Label
+           | SizeMacro TypeName
+    deriving (Show, Eq)
+
+type MInstruction = GInstr Macro
+type MProgram = GProg Macro
+
+invertInstructions :: MProgram -> MProgram
+invertInstructions (GProg p) = GProg $ reverse . map (second invertInstruction) $ p
+    where invertInstruction (ADD r1 r2) = SUB r1 r2
+          invertInstruction (SUB r1 r2) = ADD r1 r2
+          invertInstruction (ADDI r i) = SUBI r i
+          invertInstruction (SUBI r i) = ADDI r i
+          invertInstruction (RL r i) = RR r i
+          invertInstruction (RLV r1 r2) = RRV r1 r2
+          invertInstruction (RR r i) = RL r i
+          invertInstruction (RRV r1 r2) = RLV r1 r2
+          invertInstruction inst = inst
+
+{-- Output PISA Definitions --}
+
+type Instruction = GInstr Integer
+type Program = GProg Integer
 
 instance Show Register where
     show (Reg r) = "$" ++ show r
@@ -64,7 +95,7 @@ instance Show Instruction where
     show (RL r i) = unwords ["RL    ", show r, show i]
     show (RLV r1 r2) = unwords ["RLV   ", show r1, show r2]
     show (RR r i) = unwords ["RR    ", show r, show i]
-    show (RRV r i) = unwords ["RRV   ", show r, show i]
+    show (RRV r1 r2) = unwords ["RRV   ", show r1, show r2]
     show (SLLX r1 r2 i) = unwords ["SLLX  ", show r1, show r2, show i]
     show (SLLVX r1 r2 r3) = unwords ["SLLVX ", show r1, show r2, show r3]
     show (SRAX r1 r2 i) = unwords ["SRAX  ", show r1, show r2, show i]
@@ -87,11 +118,12 @@ instance Show Instruction where
     show START = "START "
     show FINISH = "FINISH"
     show (DATA i) = unwords ["DATA  ", show i]
+    show (SUBI r i) = unwords ["ADDI  ", show r, show $ -i] --Expand pseudo
 
 showProgram :: Program -> String
-showProgram xs = intercalate "\n" $ map showLine xs
-    where showLine (Nothing, i) = spaces 15 ++ show i
-          showLine (Just l, i) = l ++ ":" ++ spaces (14 - length l) ++ show i
+showProgram (GProg p) = ";; pendulum pal file\n" ++ intercalate "\n" (map showLine p)
+    where showLine (Nothing, i) = spaces 25 ++ show i
+          showLine (Just l, i) = l ++ ":" ++ spaces (24 - length l) ++ show i
           spaces :: (Int -> String)
           spaces n = [1..n] >> " "
 

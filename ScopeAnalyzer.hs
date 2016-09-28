@@ -173,22 +173,22 @@ getSubClasses n =
            (Just sc') -> return $ mapMaybe (rlookup cs) sc'
     where rlookup = flip lookup
 
-saClass :: ClassDeclaration -> ScopeAnalyzer [(TypeName, SMethodDeclaration)]
-saClass (GCDecl c _ fs ms) =
+saClass :: Integer -> ClassDeclaration -> ScopeAnalyzer [(TypeName, SMethodDeclaration)]
+saClass offset (GCDecl c _ fs ms) =
     do enterScope
-       mapM_ insertClassField fs
+       mapM_ insertClassField $ zip [offset..] fs
        mapM_ insertMethod ms
        sc <- getSubClasses c
-       ms' <- concat <$> mapM saClass sc
+       ms' <- concat <$> mapM (saClass $ genericLength fs + offset) sc
        ms'' <- mapM saMethod $ zip (repeat c) ms
        leaveScope
        return $ ms' ++ ms''
-    where insertClassField (GDecl tp n) = saInsert (ClassField tp n c) n
+    where insertClassField (o, GDecl tp n) = saInsert (ClassField tp n c o) n
           insertMethod (GMDecl n ps _) = saInsert (Method (map getType ps) n) n
           getType (GDecl tp _) = tp
 
 saProgram :: Program -> ScopeAnalyzer SProgram
-saProgram (GProg cs) = concat <$> mapM saClass cs
+saProgram (GProg cs) = concat <$> mapM (saClass 1) cs
 
 scopeAnalysis :: (Program, CAState) -> Either String (SProgram, SAState)
 scopeAnalysis (p, s) = runExcept $ runStateT (runSA $ saProgram p) $ initialState s

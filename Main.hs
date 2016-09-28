@@ -6,6 +6,7 @@ import PISA
 import ClassAnalyzer
 import ScopeAnalyzer
 import TypeChecker
+import MacroExpander
 
 import qualified Data.ByteString as Str
 import qualified Data.ByteString.Char8 as C

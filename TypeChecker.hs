@@ -18,7 +18,7 @@ getType :: SIdentifier -> TypeChecker DataType
 getType i = asks symbolTable >>= \st ->
     case lookup i st of
         (Just (LocalVariable t _)) -> return t
-        (Just (ClassField t _ _)) -> return t
+        (Just (ClassField t _ _ _)) -> return t
         (Just (MethodParameter t _)) -> return t
         _ -> throwError $ "ICE: Invalid index " ++ show i
 
@@ -31,30 +31,28 @@ getParameterTypes i = asks symbolTable >>= \st ->
 expectType :: DataType -> DataType -> TypeChecker ()
 expectType t1 t2 = unless (t1 == t2) (throwError $ "Expected type: " ++ show t1 ++ "\nActual type: " ++ show t2)
 
-getDynamicParameterTypes :: MethodName -> TypeName -> TypeChecker [DataType]
-getDynamicParameterTypes m t = asks (classMethods . caState) >>= \cm ->
-    case lookup t cm of
-        Nothing -> throwError $ "ICE: Unknown class " ++ t
-        (Just ms) -> case find (\(GMDecl m' _ _) -> m == m') ms of
-                         Nothing -> throwError $ "Class " ++ t ++ " does not support method " ++ m
-                         (Just (GMDecl _ ps _)) -> return $ map (\(GDecl tp _) -> tp) ps
+getClassMethods :: TypeName -> TypeChecker [MethodDeclaration]
+getClassMethods n = asks (classMethods . caState) >>= \cm ->
+    case lookup n cm of
+        Nothing -> throwError $ "ICE: Unknown class " ++ n
+        (Just ms) -> return ms
+
+getDynamicParameterTypes :: TypeName -> MethodName -> TypeChecker [DataType]
+getDynamicParameterTypes n m = getClassMethods n >>= \ms ->
+    case find (\(GMDecl m' _ _) -> m == m') ms of
+        Nothing -> throwError $ "Class " ++ n ++ " does not support method " ++ m
+        (Just (GMDecl _ ps _)) -> return $ map (\(GDecl tp _) -> tp) ps
 
 checkCall :: [SIdentifier] -> [DataType] -> TypeChecker ()
-checkCall args ps = when (la /= lp) (throwError err) >> mapM_ checkArgument (zip args ps)
+checkCall args ps = when (la /= lp) (throwError err) >> mapM getType args >>= \as -> mapM_ checkArgument (zip as ps)
     where la = length args
           lp = length ps
           err = "Passed " ++ show la ++ " argument(s) to method expecting " ++ show lp ++ " argument(s)"
 
-checkArgument :: (SIdentifier, DataType) -> TypeChecker ()
-checkArgument (i, tp) =
-    do ta <- getType i
-       sc <- asks $ superClass . caState
-       case (ta, tp) of
-           (ObjectType ca, ObjectType cp) -> unless (isSubtype sc cp ca) (throwError $ "Class " ++ ca ++ " not a subtype of class " ++ cp)
-           _ -> expectType tp ta
-
-isSubtype :: [(TypeName, Maybe TypeName)] -> TypeName -> TypeName -> Bool
-isSubtype sc cp ca = (ca == cp) || maybe False (isSubtype sc cp)  (join $ lookup ca sc)
+checkArgument :: (DataType, DataType) -> TypeChecker ()
+checkArgument (ObjectType ca, ObjectType cp) = asks (superClasses . caState) >>= \sc ->
+    unless (ca == cp || maybe False (elem cp) (lookup ca sc)) (throwError $ "Class " ++ ca ++ " not a subtype of class " ++ cp)
+checkArgument (ta, tp) = expectType tp ta
 
 tcExpression :: SExpression -> TypeChecker DataType
 tcExpression (Constant _) = pure IntegerType
@@ -126,13 +124,13 @@ tcStatement s =
         (ObjectCall o m args) ->
             do t <- getType o
                case t of
-                   (ObjectType tn) -> getDynamicParameterTypes m tn >>= checkCall args
+                   (ObjectType tn) -> getDynamicParameterTypes tn m >>= checkCall args
                    _ -> throwError $ "Non-object type " ++ show t ++ " does not support method invocation"
 
         (ObjectUncall o m args) ->
             do t <- getType o
                case t of
-                   (ObjectType tn) -> getDynamicParameterTypes m tn >>= checkCall args
+                   (ObjectType tn) -> getDynamicParameterTypes tn m >>= checkCall args
                    _ -> throwError $ "Non-object type " ++ show t ++ " does not support method invocation"
 
         Skip -> pure ()
