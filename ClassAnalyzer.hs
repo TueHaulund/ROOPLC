@@ -140,5 +140,5 @@ caProgram (GProg p) =
           noBase (GCDecl _ Nothing _ _) = True
           noBase _ = False
 
-classAnalysis :: Program -> Either String (Program, CAState)
-classAnalysis p = runExcept $ runStateT (runCA $ caProgram p) initialState
+classAnalysis :: Program -> Except String (Program, CAState)
+classAnalysis p = runStateT (runCA $ caProgram p) initialState

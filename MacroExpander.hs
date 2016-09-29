@@ -90,5 +90,5 @@ meProgram :: MProgram -> MacroExpander Program
 meProgram (GProg p) = GProg <$> mapM expandPair p
     where expandPair (l, i) = (,) l <$> meInstruction i
 
-expandMacros :: (MProgram, CAState) -> Either String Program
-expandMacros (p, s) = runExcept $ runReaderT (runME $ meProgram p) $ initialState p s
+expandMacros :: (MProgram, CAState) -> Except String Program
+expandMacros (p, s) = runReaderT (runME $ meProgram p) $ initialState p s

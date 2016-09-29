@@ -190,5 +190,5 @@ saClass offset (GCDecl c _ fs ms) =
 saProgram :: Program -> ScopeAnalyzer SProgram
 saProgram (GProg cs) = concat <$> mapM (saClass 1) cs
 
-scopeAnalysis :: (Program, CAState) -> Either String (SProgram, SAState)
-scopeAnalysis (p, s) = runExcept $ runStateT (runSA $ saProgram p) $ initialState s
+scopeAnalysis :: (Program, CAState) -> Except String (SProgram, SAState)
+scopeAnalysis (p, s) = runStateT (runSA $ saProgram p) $ initialState s

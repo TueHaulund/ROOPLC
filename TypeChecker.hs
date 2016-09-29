@@ -150,5 +150,5 @@ tcMethod (_, GMDecl i (_:_) body) = getMethodName i >>= \n ->
 tcProgram :: SProgram -> TypeChecker (SProgram, SAState)
 tcProgram p = (,) p <$> (mapM_ tcMethod p >> ask)
 
-typeCheck :: (SProgram, SAState) -> Either String (SProgram, SAState)
-typeCheck (p, s) = runExcept $ runReaderT (runTC $ tcProgram p) s
+typeCheck :: (SProgram, SAState) -> Except String (SProgram, SAState)
+typeCheck (p, s) = runReaderT (runTC $ tcProgram p) s

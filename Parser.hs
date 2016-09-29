@@ -1,5 +1,9 @@
 module Parser (parseString) where
 
+import Control.Monad.Except
+import Data.Functor.Identity
+import Data.Bifunctor
+
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Expr
@@ -250,5 +254,5 @@ classDeclaration =
 program :: Parser Program
 program = spaces >> GProg <$> many1 classDeclaration <* eof
 
-parseString :: String -> Either ParseError Program
-parseString = parse program ""
+parseString :: String -> Except String Program
+parseString s = ExceptT (Identity $ first show $ parse program "" s)

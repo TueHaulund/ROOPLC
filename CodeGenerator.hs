@@ -258,8 +258,8 @@ cgMethod (n, GMDecl m ps body) =
 cgProgram :: SProgram -> CodeGenerator PISA.MProgram
 cgProgram p = PISA.GProg <$> concat <$> mapM cgMethod p
 
-generatePISA :: (SProgram, SAState) -> Either String (PISA.MProgram, CAState)
-generatePISA (p, s) = runExcept $ second (caState . saState) <$> (runStateT (runCG $ cgProgram p) $ initialState s)
+generatePISA :: (SProgram, SAState) -> Except String (PISA.MProgram, CAState)
+generatePISA (p, s) = second (caState . saState) <$> (runStateT (runCG $ cgProgram p) $ initialState s)
 
 {--
 $0 = 0
