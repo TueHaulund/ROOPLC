@@ -7,6 +7,12 @@ class Foo
     method test(int y)
         y += 2
 
+class Qux inherits Foo
+    int h
+
+    method run(int a)
+        h += 2
+
 class Bar inherits Foo
     int b
 

@@ -20,7 +20,15 @@ main =
     do input <- Str.readFile "example.rpl"
        case compileProgram $ C.unpack input of
            Left err -> putStr $ err ++ "\n"
-           Right p -> writeProgram "example.pal" p
+           Right p -> putStr $ showProgram p
+           --Right p -> writeProgram "example.pal" p
 
 compileProgram :: String -> Either Error Program
-compileProgram s = runExcept $ parseString s >>= classAnalysis >>= scopeAnalysis >>= typeCheck >>= generatePISA >>= expandMacros
+compileProgram s =
+    runExcept $
+    parseString s
+    >>= classAnalysis
+    >>= scopeAnalysis
+    >>= typeCheck
+    >>= generatePISA
+    >>= expandMacros

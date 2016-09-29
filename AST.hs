@@ -103,8 +103,10 @@ type SProgram = [(TypeName, GMDecl SIdentifier SIdentifier)]
 
 {-- Other Definitions --}
 
+type Offset = Integer
+
 data Symbol = LocalVariable DataType Identifier
-            | ClassField DataType Identifier TypeName Integer
+            | ClassField DataType Identifier TypeName Offset
             | MethodParameter DataType Identifier
             | Method [DataType] MethodName
     deriving (Show, Eq)

@@ -2,6 +2,7 @@
 
 module ScopeAnalyzer (scopeAnalysis, SAState(..)) where
 
+import Data.Function
 import Data.Maybe
 import Data.List
 
@@ -16,6 +17,7 @@ data SAState =
         symbolIndex :: SIdentifier,
         symbolTable :: SymbolTable,
         scopeStack :: [Scope],
+        virtualTables :: [(TypeName, [SIdentifier])],
         caState :: CAState
     } deriving (Show, Eq)
 
@@ -23,7 +25,7 @@ newtype ScopeAnalyzer a = ScopeAnalyzer { runSA :: StateT SAState (Except String
     deriving (Functor, Applicative, Monad, MonadState SAState, MonadError String)
 
 initialState :: CAState -> SAState
-initialState s = SAState { symbolIndex = 0, symbolTable = [], scopeStack = [], caState = s }
+initialState s = SAState { symbolIndex = 0, symbolTable = [], scopeStack = [], virtualTables = [], caState = s }
 
 enterScope :: ScopeAnalyzer ()
 enterScope = modify $ \s -> s { scopeStack = [] : scopeStack s }
@@ -40,7 +42,7 @@ topScope = gets scopeStack >>= \ss ->
 addToScope :: (Identifier, SIdentifier) -> ScopeAnalyzer ()
 addToScope b =
     do ts <- topScope
-       modify $ \s -> s { scopeStack = (b : ts) : scopeStack s }
+       modify $ \s -> s { scopeStack = (b : ts) : drop 1 (scopeStack s) }
 
 saInsert :: Symbol -> Identifier -> ScopeAnalyzer SIdentifier
 saInsert sym n =
@@ -173,22 +175,32 @@ getSubClasses n =
            (Just sc') -> return $ mapMaybe (rlookup cs) sc'
     where rlookup = flip lookup
 
-saClass :: Integer -> ClassDeclaration -> ScopeAnalyzer [(TypeName, SMethodDeclaration)]
-saClass offset (GCDecl c _ fs ms) =
+getMethodName :: SIdentifier -> ScopeAnalyzer (SIdentifier, MethodName)
+getMethodName i = gets symbolTable >>= \st ->
+    case lookup i st of
+        (Just (Method _ m)) -> return (i, m)
+        _ -> throwError $ "ICE: Invalid method index " ++ show i
+
+saClass :: Offset -> [SIdentifier] -> ClassDeclaration -> ScopeAnalyzer [(TypeName, SMethodDeclaration)]
+saClass offset pids (GCDecl c _ fs ms) =
     do enterScope
        mapM_ insertClassField $ zip [offset..] fs
-       mapM_ insertMethod ms
+       m1 <- mapM insertMethod ms
+       m2 <- mapM getMethodName pids
+       let m3 = map fst $ unionBy ((==) `on` snd) m1 m2
+           offset' = genericLength fs + offset
+       modify $ \s -> s { virtualTables = (c, m3) : virtualTables s }
        sc <- getSubClasses c
-       ms' <- concat <$> mapM (saClass $ genericLength fs + offset) sc
+       ms' <- concat <$> mapM (saClass offset' m3) sc
        ms'' <- mapM saMethod $ zip (repeat c) ms
        leaveScope
        return $ ms' ++ ms''
     where insertClassField (o, GDecl tp n) = saInsert (ClassField tp n c o) n
-          insertMethod (GMDecl n ps _) = saInsert (Method (map getType ps) n) n
+          insertMethod (GMDecl n ps _) = saInsert (Method (map getType ps) n) n >>= getMethodName
           getType (GDecl tp _) = tp
 
 saProgram :: Program -> ScopeAnalyzer SProgram
-saProgram (GProg cs) = concat <$> mapM (saClass 1) cs
+saProgram (GProg cs) = concat <$> mapM (saClass 1 []) cs
 
 scopeAnalysis :: (Program, CAState) -> Except String (SProgram, SAState)
 scopeAnalysis (p, s) = runStateT (runSA $ saProgram p) $ initialState s

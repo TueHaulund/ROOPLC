@@ -229,7 +229,7 @@ cgStatement s =
         Skip -> return []
 
 cgMethod :: (TypeName, SMethodDeclaration) -> CodeGenerator [(Maybe Label, MInstruction)]
-cgMethod (n, GMDecl m ps body) =
+cgMethod (_, GMDecl m ps body) =
     do l <- getMethodLabel m
        rs <- addParameters
        body' <- concat <$> mapM cgStatement body
@@ -255,8 +255,17 @@ cgMethod (n, GMDecl m ps body) =
           popParameter r = [(Nothing, ADDI registerSP $ Immediate (-1)), (Nothing, EXCH r registerSP)]
           pushParameter r = [(Nothing, EXCH r registerSP), (Nothing, ADDI registerSP $ Immediate 1)]
 
+cgVirtualTables :: CodeGenerator [(Maybe Label, MInstruction)]
+cgVirtualTables = gets (virtualTables . saState) >>= mapM vtInstructions >>= return . concat
+    where vtInstructions (n, ms) = mapM vtData ms >>= return . (zip $ vtLabel n)
+          vtData m = getMethodLabel m >>= return . DATA . AddressMacro
+          vtLabel n = (Just $ "l_" ++ n ++ "_vt") : repeat Nothing
+
 cgProgram :: SProgram -> CodeGenerator PISA.MProgram
-cgProgram p = PISA.GProg <$> concat <$> mapM cgMethod p
+cgProgram p =
+    do vt <- cgVirtualTables
+       ms <- concat <$> mapM cgMethod p
+       return $ PISA.GProg $ vt ++ ms
 
 generatePISA :: (SProgram, SAState) -> Except String (PISA.MProgram, CAState)
 generatePISA (p, s) = second (caState . saState) <$> (runStateT (runCG $ cgProgram p) $ initialState s)
