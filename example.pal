@@ -194,22 +194,18 @@ l_go_1:                  SWAPBR $2
                          EXCH   $5 $4
                          XOR    $5 $3
                          ADDI   $5 1
-                         EXCH   $4 $1
-                         ADDI   $1 1
                          EXCH   $5 $1
                          ADDI   $1 1
-                         EXCH   $3 $1
+                         EXCH   $4 $1
                          ADDI   $1 1
-                         ADDI   $7 -202
+                         ADDI   $7 -200
 jmp_5:                   SWAPBR $7
                          NEG    $7
-                         ADDI   $7 202
-                         ADDI   $1 -1
-                         EXCH   $3 $1
-                         ADDI   $1 -1
-                         EXCH   $5 $1
+                         ADDI   $7 200
                          ADDI   $1 -1
                          EXCH   $4 $1
+                         ADDI   $1 -1
+                         EXCH   $5 $1
                          ADDI   $5 -1
                          XOR    $5 $3
                          EXCH   $5 $4
@@ -221,8 +217,8 @@ jmp_5:                   SWAPBR $7
                          EXCH   $5 $4
 l_go_1_bot:              BRA    l_go_1_top
 start:                   BRA    top
-                         START 
-                         ADDI   $1 239
+                         START
+                         ADDI   $1 235
                          XOR    $3 $1
                          XORI   $4 1
                          EXCH   $4 $1
@@ -236,5 +232,5 @@ start:                   BRA    top
                          EXCH   $4 $1
                          XORI   $4 1
                          XOR    $3 $1
-                         ADDI   $1 -239
+                         ADDI   $1 -235
 finish:                  FINISH

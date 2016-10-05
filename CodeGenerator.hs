@@ -111,6 +111,7 @@ loadVariable i = lookup i <$> gets (symbolTable . saState) >>= maybe invalid der
                  return (rt, [(Nothing, EXCH rt r)], [popTempRegister])
 
 cgExpression :: SExpression -> CodeGenerator (Register, [(Maybe Label, MInstruction)], [CodeGenerator ()])
+cgExpression (Constant 0) = return (registerZero, [], [])
 cgExpression (Constant n) = tempRegister >>= \rt -> return (rt, [(Nothing, XORI rt $ Immediate n)], [popTempRegister])
 cgExpression (Variable i) = loadVariable i
 cgExpression Nil = return (registerZero, [], [])
@@ -240,21 +241,21 @@ loadArgument i = gets (symbolTable . saState) >>= \st ->
                return (rt, [(Nothing, XOR rt registerThis), (Nothing, ADDI rt $ Immediate o)], [popTempRegister])
         _ -> lookupRegister i >>= \r -> return (r, [], [])
 
-cgCall :: [SIdentifier] -> [(Maybe Label, MInstruction)] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgCall args jump =
+cgCall :: [SIdentifier] -> [(Maybe Label, MInstruction)] -> Register -> CodeGenerator [(Maybe Label, MInstruction)]
+cgCall args jump this =
     do (ra, la, ua) <- unzip3 <$> mapM loadArgument args
        sequence_ $ concat ua
        rs <- gets registerStack
-       let rr = map snd rs \\ ra
-           store = concatMap push $ rr ++ ra ++ [registerThis]
+       let rr = map snd rs \\ (this : ra)
+           store = concatMap push $ rr ++ ra ++ [this]
        return $ concat la ++ store ++ jump ++ invertInstructions store ++ invertInstructions (concat la)
     where push r = [(Nothing, EXCH r registerSP), (Nothing, ADDI registerSP $ Immediate 1)]
 
 cgLocalCall :: SIdentifier -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgLocalCall m args = getMethodLabel m >>= \l_m -> cgCall args [(Nothing, BRA l_m)]
+cgLocalCall m args = getMethodLabel m >>= \l_m -> cgCall args [(Nothing, BRA l_m)] registerThis
 
 cgLocalUncall :: SIdentifier -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgLocalUncall m args = getMethodLabel m >>= \l_m -> cgCall args [(Nothing, RBRA l_m)]
+cgLocalUncall m args = getMethodLabel m >>= \l_m -> cgCall args [(Nothing, RBRA l_m)] registerThis
 
 getType :: SIdentifier -> CodeGenerator TypeName
 getType i = gets (symbolTable . saState) >>= \st ->
@@ -284,7 +285,7 @@ cgObjectCall o m args =
                  (Just l_jmp, SWAPBR rtgt),
                  (Nothing, NEG rtgt),
                  (Nothing, ADDI rtgt $ AddressMacro l_jmp)]
-       call <- cgCall args jp
+       call <- cgCall args jp ro
        return $ cp ++ call ++ invertInstructions cp
 
 cgObjectUncall :: SIdentifier -> MethodName -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
@@ -312,14 +313,14 @@ cgMethod (_, GMDecl m ps body) =
        let lt = l ++ "_top"
            lb = l ++ "_bot"
            mp = [(Just lt, BRA lb),
-                 (Nothing, ADDI registerSP $ Immediate (-1)),
+                 (Nothing, SUBI registerSP $ Immediate 1),
                  (Nothing, EXCH registerRO registerSP)]
                  ++ concatMap pushParameter rs ++
                 [(Nothing, EXCH registerThis registerSP),
                  (Nothing, ADDI registerSP $ Immediate 1),
                  (Just l, SWAPBR registerRO),
                  (Nothing, NEG registerRO),
-                 (Nothing, ADDI registerSP $ Immediate (-1)),
+                 (Nothing, SUBI registerSP $ Immediate 1),
                  (Nothing, EXCH registerThis registerSP)]
                  ++ concatMap popParameter rs ++
                 [(Nothing, EXCH registerRO registerSP),
@@ -327,7 +328,7 @@ cgMethod (_, GMDecl m ps body) =
        return $ mp ++ body' ++ [(Just lb, BRA lt)]
     where addParameters = mapM (pushRegister . (\(GDecl _ p) -> p)) ps
           clearParameters = replicateM_ (length ps) popRegister
-          popParameter r = [(Nothing, ADDI registerSP $ Immediate (-1)), (Nothing, EXCH r registerSP)]
+          popParameter r = [(Nothing, SUBI registerSP $ Immediate 1), (Nothing, EXCH r registerSP)]
           pushParameter r = [(Nothing, EXCH r registerSP), (Nothing, ADDI registerSP $ Immediate 1)]
 
 cgVirtualTables :: CodeGenerator [(Maybe Label, MInstruction)]
