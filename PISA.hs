@@ -5,7 +5,7 @@ module PISA where
 import Data.List (intercalate)
 import Control.Arrow
 
-import AST (TypeName)
+import AST (TypeName, MethodName)
 
 type Label = String
 
@@ -58,6 +58,7 @@ data GProg i = GProg [(Maybe Label, GInstr i)]
 data Macro = Immediate Integer
            | AddressMacro Label
            | SizeMacro TypeName
+           | OffsetMacro TypeName MethodName
            | ProgramSize
     deriving (Show, Eq)
 

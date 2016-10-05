@@ -232,26 +232,63 @@ cgLocalBlock n e1 stmt e2 =
            clear = le2 ++ invertInstructions (create re2 rt2) ++ invertInstructions le2
        return $ load ++ stmt' ++ clear
 
-cgLocal :: [SIdentifier] -> [(Maybe Label, MInstruction)] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgLocal args jump =
-    do r_args <- mapM lookupRegister args
+loadArgument :: SIdentifier -> CodeGenerator (Register, [(Maybe Label, MInstruction)], [CodeGenerator ()])
+loadArgument i = gets (symbolTable . saState) >>= \st ->
+    case lookup i st of
+        (Just (ClassField _ _ _ o)) ->
+            do rt <- tempRegister
+               return (rt, [(Nothing, XOR rt registerThis), (Nothing, ADDI rt $ Immediate o)], [popTempRegister])
+        _ -> lookupRegister i >>= \r -> return (r, [], [])
+
+cgCall :: [SIdentifier] -> [(Maybe Label, MInstruction)] -> CodeGenerator [(Maybe Label, MInstruction)]
+cgCall args jump =
+    do (ra, la, ua) <- unzip3 <$> mapM loadArgument args
+       sequence_ $ concat ua
        rs <- gets registerStack
-       let r_rest = map snd rs \\ r_args
-           store = concatMap push $ r_rest ++ r_args ++ [registerThis]
-       return $ store ++ jump ++ invertInstructions store
+       let rr = map snd rs \\ ra
+           store = concatMap push $ rr ++ ra ++ [registerThis]
+       return $ concat la ++ store ++ jump ++ invertInstructions store ++ invertInstructions (concat la)
     where push r = [(Nothing, EXCH r registerSP), (Nothing, ADDI registerSP $ Immediate 1)]
 
 cgLocalCall :: SIdentifier -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgLocalCall m args = getMethodLabel m >>= \l_m -> cgLocal args [(Nothing, BRA l_m)]
+cgLocalCall m args = getMethodLabel m >>= \l_m -> cgCall args [(Nothing, BRA l_m)]
 
 cgLocalUncall :: SIdentifier -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgLocalUncall m args = getMethodLabel m >>= \l_m -> cgLocal args [(Nothing, RBRA l_m)]
+cgLocalUncall m args = getMethodLabel m >>= \l_m -> cgCall args [(Nothing, RBRA l_m)]
+
+getType :: SIdentifier -> CodeGenerator TypeName
+getType i = gets (symbolTable . saState) >>= \st ->
+    case lookup i st of
+        (Just (LocalVariable (ObjectType tp) _)) -> return tp
+        (Just (ClassField (ObjectType tp) _ _ _)) -> return tp
+        (Just (MethodParameter (ObjectType tp) _)) -> return tp
+        _ -> throwError $ "ICE: Invalid object variable index " ++ show i
 
 cgObjectCall :: SIdentifier -> MethodName -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgObjectCall o m args = return []
+cgObjectCall o m args =
+    do ro <- lookupRegister o
+       rv <- tempRegister
+       rt <- tempRegister
+       rtgt <- tempRegister
+       popTempRegister >> popTempRegister >> popTempRegister
+       l_jmp <- getUniqueLabel "jmp"
+       tp <- getType o
+       let cp = [(Nothing, EXCH rv ro),
+                 (Nothing, ADDI rv $ OffsetMacro tp m),
+                 (Nothing, EXCH rt rv),
+                 (Nothing, XOR rtgt rt),
+                 (Nothing, EXCH rt rv),
+                 (Nothing, SUBI rv $ OffsetMacro tp m),
+                 (Nothing, EXCH rv ro)]
+           jp = [(Nothing, SUBI rtgt $ AddressMacro l_jmp),
+                 (Just l_jmp, SWAPBR rtgt),
+                 (Nothing, NEG rtgt),
+                 (Nothing, ADDI rtgt $ AddressMacro l_jmp)]
+       call <- cgCall args jp
+       return $ cp ++ call ++ invertInstructions cp
 
 cgObjectUncall :: SIdentifier -> MethodName -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgObjectUncall o m args = return []
+cgObjectUncall = cgObjectCall --TODO
 
 cgStatement :: SStatement -> CodeGenerator [(Maybe Label, MInstruction)]
 cgStatement (Assign n modop e) = cgAssign n modop e
@@ -299,14 +336,47 @@ cgVirtualTables = concat <$> (gets (virtualTables . saState) >>= mapM vtInstruct
           vtData m = DATA . AddressMacro <$> getMethodLabel m
           vtLabel n = (Just $ "l_" ++ n ++ "_vt") : repeat Nothing
 
+getMainLabel :: CodeGenerator Label
+getMainLabel = gets (mainMethod . saState) >>= getMethodLabel
+
+getMainClass :: CodeGenerator TypeName
+getMainClass = gets (mainClass . caState . saState) >>= \mc ->
+    case mc of
+        (Just tp) -> return tp
+        Nothing -> throwError "ICE: No main method defined"
+
 cgProgram :: SProgram -> CodeGenerator PISA.MProgram
 cgProgram p =
     do vt <- cgVirtualTables
+       rv <- tempRegister
+       popTempRegister
        ms <- concat <$> mapM cgMethod p
-       return $ PISA.GProg $ vt ++ ms
+       l_main <- getMainLabel
+       mtp <- getMainClass
+       let mvt = "l_" ++ mtp ++ "_vt"
+           mn = [(Just "start", BRA "top"),
+                 (Nothing, START),
+                 (Nothing, ADDI registerSP ProgramSize),
+                 (Nothing, XOR registerThis registerSP),
+                 (Nothing, XORI rv $ AddressMacro mvt),
+                 (Nothing, EXCH rv registerSP),
+                 (Nothing, ADDI registerSP $ SizeMacro mtp),
+                 (Nothing, EXCH registerThis registerSP),
+                 (Nothing, ADDI registerSP $ Immediate 1),
+                 (Nothing, BRA l_main),
+                 (Nothing, SUBI registerSP $ Immediate 1),
+                 (Nothing, EXCH registerThis registerSP),
+                 --TODO: copy results to static storage
+                 (Nothing, SUBI registerSP $ SizeMacro mtp),
+                 (Nothing, EXCH rv registerSP),
+                 (Nothing, XORI rv $ AddressMacro mvt),
+                 (Nothing, XOR registerThis registerSP),
+                 (Nothing, SUBI registerSP ProgramSize),
+                 (Just "finish", FINISH)]
+       return $ PISA.GProg $ [(Just "top", BRA "start")] ++ vt ++ ms ++ mn
 
-generatePISA :: (SProgram, SAState) -> Except String (PISA.MProgram, CAState)
-generatePISA (p, s) = second (caState . saState) <$> runStateT (runCG $ cgProgram p) (initialState s)
+generatePISA :: (SProgram, SAState) -> Except String (PISA.MProgram, SAState)
+generatePISA (p, s) = second saState <$> runStateT (runCG $ cgProgram p) (initialState s)
 
 {--
 $0 = 0

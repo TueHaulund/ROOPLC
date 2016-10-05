@@ -1,22 +1,18 @@
 ;; pendulum pal file
-l_Program_vt:            DATA   163
-                         DATA   205
-l_Qux_vt:                DATA   103
-                         DATA   144
-l_Bar_vt:                DATA   60
-                         DATA   144
-l_Baz_vt:                DATA   17
-                         DATA   144
-l_Foo_vt:                DATA   128
-                         DATA   144
-l_run_5_top:             BRA    l_run_5_bot
+top:                     BRA    start
+l_Program_vt:            DATA   113
+                         DATA   169
+l_Bar_vt:                DATA   56
+l_Baz_vt:                DATA   13
+l_Foo_vt:                DATA   99
+l_run_3_top:             BRA    l_run_3_bot
                          ADDI   $1 -1
                          EXCH   $2 $1
                          EXCH   $4 $1
                          ADDI   $1 1
                          EXCH   $3 $1
                          ADDI   $1 1
-l_run_5:                 SWAPBR $2
+l_run_3:                 SWAPBR $2
                          NEG    $2
                          ADDI   $1 -1
                          EXCH   $3 $1
@@ -25,21 +21,21 @@ l_run_5:                 SWAPBR $2
                          EXCH   $2 $1
                          ADDI   $1 1
                          ADD    $5 $3
-                         ADDI   $5 2
+                         ADDI   $5 1
                          EXCH   $6 $5
                          XORI   $7 5
                          ADD    $6 $7
                          XORI   $7 5
                          EXCH   $6 $5
-                         ADDI   $5 -2
+                         ADDI   $5 -1
                          SUB    $5 $3
                          EXCH   $5 $4
                          ADD    $6 $3
-                         ADDI   $6 2
+                         ADDI   $6 1
                          EXCH   $7 $6
                          SUB    $5 $7
                          EXCH   $7 $6
-                         ADDI   $6 -2
+                         ADDI   $6 -1
                          SUB    $6 $3
                          EXCH   $5 $4
                          ADD    $5 $3
@@ -51,50 +47,7 @@ l_run_5:                 SWAPBR $2
                          EXCH   $6 $5
                          ADDI   $5 -1
                          SUB    $5 $3
-l_run_5_bot:             BRA    l_run_5_top
-l_run_4_top:             BRA    l_run_4_bot
-                         ADDI   $1 -1
-                         EXCH   $2 $1
-                         EXCH   $4 $1
-                         ADDI   $1 1
-                         EXCH   $3 $1
-                         ADDI   $1 1
-l_run_4:                 SWAPBR $2
-                         NEG    $2
-                         ADDI   $1 -1
-                         EXCH   $3 $1
-                         ADDI   $1 -1
-                         EXCH   $4 $1
-                         EXCH   $2 $1
-                         ADDI   $1 1
-                         ADD    $5 $3
-                         ADDI   $5 2
-                         EXCH   $6 $5
-                         XORI   $7 6
-                         ADD    $6 $7
-                         XORI   $7 6
-                         EXCH   $6 $5
-                         ADDI   $5 -2
-                         SUB    $5 $3
-                         EXCH   $5 $4
-                         ADD    $6 $3
-                         ADDI   $6 2
-                         EXCH   $7 $6
-                         ADD    $5 $7
-                         EXCH   $7 $6
-                         ADDI   $6 -2
-                         SUB    $6 $3
-                         EXCH   $5 $4
-                         ADD    $5 $3
-                         ADDI   $5 2
-                         EXCH   $6 $5
-                         XORI   $7 6
-                         SUB    $6 $7
-                         XORI   $7 6
-                         EXCH   $6 $5
-                         ADDI   $5 -2
-                         SUB    $5 $3
-l_run_4_bot:             BRA    l_run_4_top
+l_run_3_bot:             BRA    l_run_3_top
 l_run_2_top:             BRA    l_run_2_bot
                          ADDI   $1 -1
                          EXCH   $2 $1
@@ -111,23 +64,41 @@ l_run_2:                 SWAPBR $2
                          EXCH   $2 $1
                          ADDI   $1 1
                          ADD    $5 $3
-                         ADDI   $5 2
+                         ADDI   $5 1
                          EXCH   $6 $5
-                         XORI   $7 2
+                         XORI   $7 6
                          ADD    $6 $7
-                         XORI   $7 2
+                         XORI   $7 6
                          EXCH   $6 $5
-                         ADDI   $5 -2
+                         ADDI   $5 -1
+                         SUB    $5 $3
+                         EXCH   $5 $4
+                         ADD    $6 $3
+                         ADDI   $6 1
+                         EXCH   $7 $6
+                         ADD    $5 $7
+                         EXCH   $7 $6
+                         ADDI   $6 -1
+                         SUB    $6 $3
+                         EXCH   $5 $4
+                         ADD    $5 $3
+                         ADDI   $5 1
+                         EXCH   $6 $5
+                         XORI   $7 6
+                         SUB    $6 $7
+                         XORI   $7 6
+                         EXCH   $6 $5
+                         ADDI   $5 -1
                          SUB    $5 $3
 l_run_2_bot:             BRA    l_run_2_top
-l_run_6_top:             BRA    l_run_6_bot
+l_run_4_top:             BRA    l_run_4_bot
                          ADDI   $1 -1
                          EXCH   $2 $1
                          EXCH   $4 $1
                          ADDI   $1 1
                          EXCH   $3 $1
                          ADDI   $1 1
-l_run_6:                 SWAPBR $2
+l_run_4:                 SWAPBR $2
                          NEG    $2
                          ADDI   $1 -1
                          EXCH   $3 $1
@@ -135,28 +106,7 @@ l_run_6:                 SWAPBR $2
                          EXCH   $4 $1
                          EXCH   $2 $1
                          ADDI   $1 1
-l_run_6_bot:             BRA    l_run_6_top
-l_test_3_top:            BRA    l_test_3_bot
-                         ADDI   $1 -1
-                         EXCH   $2 $1
-                         EXCH   $4 $1
-                         ADDI   $1 1
-                         EXCH   $3 $1
-                         ADDI   $1 1
-l_test_3:                SWAPBR $2
-                         NEG    $2
-                         ADDI   $1 -1
-                         EXCH   $3 $1
-                         ADDI   $1 -1
-                         EXCH   $4 $1
-                         EXCH   $2 $1
-                         ADDI   $1 1
-                         EXCH   $5 $4
-                         XORI   $6 2
-                         ADD    $5 $6
-                         XORI   $6 2
-                         EXCH   $5 $4
-l_test_3_bot:            BRA    l_test_3_top
+l_run_4_bot:             BRA    l_run_4_top
 l_main_0_top:            BRA    l_main_0_bot
                          ADDI   $1 -1
                          EXCH   $2 $1
@@ -169,32 +119,46 @@ l_main_0:                SWAPBR $2
                          EXCH   $2 $1
                          ADDI   $1 1
                          XOR    $4 $1
-                         XORI   $5 0
+                         XORI   $5 3
                          EXCH   $5 $1
-                         ADDI   $1 0
+                         ADDI   $1 2
                          XOR    $5 $1
-                         XORI   $6 0
+                         XORI   $6 4
                          EXCH   $6 $1
-                         ADDI   $1 0
-                         XORI   $7 2
-                         XOR    $6 $1
-                         XOR    $8 $7
-                         EXCH   $8 $1
+                         ADDI   $1 2
+                         EXCH   $5 $1
                          ADDI   $1 1
-                         XORI   $7 2
-                         XORI   $7 2
+                         EXCH   $4 $1
+                         ADDI   $1 1
+                         EXCH   $3 $1
+                         ADDI   $1 1
+                         BRA    l_go_1
                          ADDI   $1 -1
-                         EXCH   $8 $1
-                         XOR    $8 $7
-                         XOR    $6 $1
-                         XORI   $7 2
-                         ADDI   $1 0
-                         EXCH   $6 $1
-                         XORI   $6 0
-                         XOR    $5 $1
-                         ADDI   $1 0
+                         EXCH   $3 $1
+                         ADDI   $1 -1
+                         EXCH   $4 $1
+                         ADDI   $1 -1
                          EXCH   $5 $1
-                         XORI   $5 0
+                         EXCH   $4 $1
+                         ADDI   $1 1
+                         EXCH   $5 $1
+                         ADDI   $1 1
+                         EXCH   $3 $1
+                         ADDI   $1 1
+                         RBRA   l_go_1
+                         ADDI   $1 -1
+                         EXCH   $3 $1
+                         ADDI   $1 -1
+                         EXCH   $5 $1
+                         ADDI   $1 -1
+                         EXCH   $4 $1
+                         ADDI   $1 -2
+                         EXCH   $6 $1
+                         XORI   $6 4
+                         XOR    $5 $1
+                         ADDI   $1 -2
+                         EXCH   $5 $1
+                         XORI   $5 3
                          XOR    $4 $1
 l_main_0_bot:            BRA    l_main_0_top
 l_go_1_top:              BRA    l_go_1_bot
@@ -221,4 +185,56 @@ l_go_1:                  SWAPBR $2
                          EXCH   $6 $5
                          ADDI   $5 -1
                          SUB    $5 $3
+                         EXCH   $5 $4
+                         ADDI   $5 0
+                         EXCH   $6 $5
+                         XOR    $7 $6
+                         EXCH   $6 $5
+                         ADDI   $5 0
+                         EXCH   $5 $4
+                         XOR    $5 $3
+                         ADDI   $5 1
+                         EXCH   $4 $1
+                         ADDI   $1 1
+                         EXCH   $5 $1
+                         ADDI   $1 1
+                         EXCH   $3 $1
+                         ADDI   $1 1
+                         ADDI   $7 -202
+jmp_5:                   SWAPBR $7
+                         NEG    $7
+                         ADDI   $7 202
+                         ADDI   $1 -1
+                         EXCH   $3 $1
+                         ADDI   $1 -1
+                         EXCH   $5 $1
+                         ADDI   $1 -1
+                         EXCH   $4 $1
+                         ADDI   $5 -1
+                         XOR    $5 $3
+                         EXCH   $5 $4
+                         ADDI   $5 0
+                         EXCH   $6 $5
+                         XOR    $7 $6
+                         EXCH   $6 $5
+                         ADDI   $5 0
+                         EXCH   $5 $4
 l_go_1_bot:              BRA    l_go_1_top
+start:                   BRA    top
+                         START 
+                         ADDI   $1 239
+                         XOR    $3 $1
+                         XORI   $4 1
+                         EXCH   $4 $1
+                         ADDI   $1 2
+                         EXCH   $3 $1
+                         ADDI   $1 1
+                         BRA    l_main_0
+                         ADDI   $1 -1
+                         EXCH   $3 $1
+                         ADDI   $1 -2
+                         EXCH   $4 $1
+                         XORI   $4 1
+                         XOR    $3 $1
+                         ADDI   $1 -239
+finish:                  FINISH

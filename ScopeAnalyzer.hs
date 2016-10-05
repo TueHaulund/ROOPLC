@@ -18,14 +18,15 @@ data SAState =
         symbolTable :: SymbolTable,
         scopeStack :: [Scope],
         virtualTables :: [(TypeName, [SIdentifier])],
-        caState :: CAState
+        caState :: CAState,
+        mainMethod :: SIdentifier
     } deriving (Show, Eq)
 
 newtype ScopeAnalyzer a = ScopeAnalyzer { runSA :: StateT SAState (Except String) a }
     deriving (Functor, Applicative, Monad, MonadState SAState, MonadError String)
 
 initialState :: CAState -> SAState
-initialState s = SAState { symbolIndex = 0, symbolTable = [], scopeStack = [], virtualTables = [], caState = s }
+initialState s = SAState { symbolIndex = 0, symbolTable = [], scopeStack = [], virtualTables = [], caState = s, mainMethod = 0 }
 
 enterScope :: ScopeAnalyzer ()
 enterScope = modify $ \s -> s { scopeStack = [] : scopeStack s }
@@ -156,9 +157,13 @@ saStatement s =
                when (any isCF $ mapMaybe (rlookup st) args') (throwError $ "Irreversible invocation of method " ++ m)
                return args'
 
+setMainMethod :: SIdentifier -> ScopeAnalyzer ()
+setMainMethod i = modify $ \s -> s { mainMethod = i }
+
 saMethod :: (TypeName, MethodDeclaration) -> ScopeAnalyzer (TypeName, SMethodDeclaration)
 saMethod (t, GMDecl m ps body) =
     do m' <- saLookup m
+       when (m == "main") (setMainMethod m')
        enterScope
        ps' <- mapM insertMethodParameter ps
        body' <- mapM saStatement body

@@ -1,17 +1,6 @@
 class Foo
-    int x
-
     method run(int a)
         skip
-
-    method test(int y)
-        y += 2
-
-class Qux inherits Foo
-    int h
-
-    method run(int a)
-        h += 2
 
 class Bar inherits Foo
     int b
@@ -20,7 +9,6 @@ class Bar inherits Foo
         b += 6
         a += b
         b -= 6
-        call test(a)
 
 class Baz inherits Foo
     int c
@@ -28,19 +16,16 @@ class Baz inherits Foo
     method run(int a)
         c += 5
         a -= c
-        x -= 5
+        c -= 5
 
 class Program
     int result
-    int b
 
     method main()
         construct Bar bar
         construct Baz baz
         call go(bar)
-        local int x = 2
         uncall go(baz)
-        delocal x = 2
         destruct baz
         destruct bar
 

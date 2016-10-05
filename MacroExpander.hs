@@ -7,27 +7,43 @@ import Data.List
 
 import Control.Monad.Reader
 import Control.Monad.Except
+import Control.Arrow
 
-import AST (TypeName)
+import AST hiding (Program, GProg, Offset)
 import PISA
 
+import ScopeAnalyzer
 import ClassAnalyzer
 
 type Size = Integer
 type Address = Integer
+type Offset = Integer
 
 data MEState =
     MEState {
         addressTable :: [(Label, Address)],
         sizeTable :: [(TypeName, Size)],
+        offsetTable :: [(TypeName, [(MethodName, Offset)])],
         programSize :: Size
     } deriving (Show, Eq)
 
 newtype MacroExpander a = MacroExpander { runME :: ReaderT MEState (Except String) a }
     deriving (Functor, Applicative, Monad, MonadReader MEState, MonadError String)
 
-initialState :: MProgram -> CAState -> MEState
-initialState (GProg p) s = MEState { addressTable = mapMaybe toPair $ zip [0..] p, sizeTable = classSize s, programSize = genericLength p }
+getOffsetTable :: SAState -> [(TypeName, [(MethodName, Offset)])]
+getOffsetTable s = map (second (map toOffset)) indexedVT
+    where indexedVT = map (second $ zip [0..]) $ virtualTables s
+          toOffset (i, m) = (getName $ lookup m $ symbolTable s, i)
+          getName (Just (Method _ n)) = n
+          getName _ = error "ICE: Invalid method index"
+
+initialState :: MProgram -> SAState -> MEState
+initialState (GProg p) s =
+    MEState {
+        addressTable = mapMaybe toPair $ zip [0..] p,
+        sizeTable = (classSize . caState) s,
+        offsetTable = getOffsetTable s,
+        programSize = genericLength p }
     where toPair (a, (Just l, _)) = Just (l, a)
           toPair _ = Nothing
 
@@ -43,10 +59,19 @@ getSize tn = asks sizeTable >>= \st ->
         (Just s) -> return s
         Nothing -> throwError $ "ICE: Unknown type " ++ tn
 
+getOffset :: TypeName -> MethodName -> MacroExpander Offset
+getOffset tn mn = asks offsetTable >>= \ot ->
+    case lookup tn ot of
+        Nothing -> throwError $ "ICE: Unknown type " ++ tn
+        (Just mo) -> case lookup mn mo of
+                         Nothing -> throwError $ "ICE: Unknown method " ++ mn
+                         (Just o) -> return o
+
 meMacro :: Macro -> MacroExpander Integer
 meMacro (Immediate i) = return i
 meMacro (AddressMacro l) = getAddress l
 meMacro (SizeMacro tn) = getSize tn
+meMacro (OffsetMacro tn mn) = getOffset tn mn
 meMacro ProgramSize = asks programSize
 
 meInstruction :: MInstruction -> MacroExpander Instruction
@@ -90,5 +115,5 @@ meProgram :: MProgram -> MacroExpander Program
 meProgram (GProg p) = GProg <$> mapM expandPair p
     where expandPair (l, i) = (,) l <$> meInstruction i
 
-expandMacros :: (MProgram, CAState) -> Except String Program
+expandMacros :: (MProgram, SAState) -> Except String Program
 expandMacros (p, s) = runReaderT (runME $ meProgram p) $ initialState p s
