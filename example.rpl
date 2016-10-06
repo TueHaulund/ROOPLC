@@ -18,17 +18,36 @@ class Baz inherits Foo
         a -= c
         c -= 5
 
+class Qux
+    method X()
+        skip
+
+    method Y()
+        skip
+
+    method wat(Foo f, int a)
+        uncall f::run(a)
+
 class Program
     int result
+    int test
+    int test2
+    int test3
 
     method main()
+        test += 7
+        test2 += 8
+        test3 += 9
         construct Bar bar
         construct Baz baz
-        call go(bar)
-        uncall go(baz)
+        construct Qux qux
+        call go(qux, bar)
+        call go(qux, baz)
+        destruct qux
         destruct baz
         destruct bar
 
-    method go(Foo f)
+    method go(Qux q, Foo f)
         result += 1
-        call f::run(result)
+        //call f::run(result)
+        call q::wat(f, result)

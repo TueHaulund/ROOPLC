@@ -265,31 +265,41 @@ getType i = gets (symbolTable . saState) >>= \st ->
         (Just (MethodParameter (ObjectType tp) _)) -> return tp
         _ -> throwError $ "ICE: Invalid object variable index " ++ show i
 
-cgObjectCall :: SIdentifier -> MethodName -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgObjectCall o m args =
+loadMethodAddress :: SIdentifier -> MethodName -> CodeGenerator (Register, [(Maybe Label, MInstruction)])
+loadMethodAddress o m =
     do ro <- lookupRegister o
        rv <- tempRegister
        rt <- tempRegister
        rtgt <- tempRegister
        popTempRegister >> popTempRegister >> popTempRegister
-       l_jmp <- getUniqueLabel "jmp"
-       tp <- getType o
-       let cp = [(Nothing, EXCH rv ro),
-                 (Nothing, ADDI rv $ OffsetMacro tp m),
-                 (Nothing, EXCH rt rv),
-                 (Nothing, XOR rtgt rt),
-                 (Nothing, EXCH rt rv),
-                 (Nothing, SUBI rv $ OffsetMacro tp m),
-                 (Nothing, EXCH rv ro)]
-           jp = [(Nothing, SUBI rtgt $ AddressMacro l_jmp),
+       offsetMacro <- OffsetMacro <$> getType o <*> pure m
+       return (rtgt, [(Nothing, EXCH rv ro), (Nothing, ADDI rv offsetMacro), (Nothing, EXCH rt rv), (Nothing, XOR rtgt rt), (Nothing, EXCH rt rv), (Nothing, SUBI rv offsetMacro), (Nothing, EXCH rv ro)])
+
+cgObjectCall :: SIdentifier -> MethodName -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
+cgObjectCall o m args =
+    do (rtgt, loadAddress) <- loadMethodAddress o m
+       l_jmp <- getUniqueLabel "l_jmp"
+       let jp = [(Nothing, SUBI rtgt $ AddressMacro l_jmp),
                  (Just l_jmp, SWAPBR rtgt),
                  (Nothing, NEG rtgt),
                  (Nothing, ADDI rtgt $ AddressMacro l_jmp)]
-       call <- cgCall args jp ro
-       return $ cp ++ call ++ invertInstructions cp
+       call <- (cgCall args jp <=< lookupRegister) o
+       return $ loadAddress ++ call ++ invertInstructions loadAddress
 
 cgObjectUncall :: SIdentifier -> MethodName -> [SIdentifier] -> CodeGenerator [(Maybe Label, MInstruction)]
-cgObjectUncall = cgObjectCall --TODO
+cgObjectUncall o m args =
+    do (rtgt, loadAddress) <- loadMethodAddress o m
+       l_jmp <- getUniqueLabel "l_jmp"
+       l_rjmp_top <- getUniqueLabel "l_rjmp_top"
+       l_rjmp_bot <- getUniqueLabel "l_rjmp_bot"
+       let jp = [(Nothing, SUBI rtgt $ AddressMacro l_jmp),
+                 (Just l_rjmp_top, RBRA l_rjmp_bot),
+                 (Just l_jmp, SWAPBR rtgt),
+                 (Nothing, NEG rtgt),
+                 (Just l_rjmp_bot, BRA l_rjmp_top),
+                 (Nothing, ADDI rtgt $ AddressMacro l_jmp)]
+       call <- (cgCall args jp <=< lookupRegister) o
+       return $ loadAddress ++ call ++ invertInstructions loadAddress
 
 cgStatement :: SStatement -> CodeGenerator [(Maybe Label, MInstruction)]
 cgStatement (Assign n modop e) = cgAssign n modop e
@@ -322,13 +332,12 @@ cgMethod (_, GMDecl m ps body) =
                  (Nothing, NEG registerRO),
                  (Nothing, SUBI registerSP $ Immediate 1),
                  (Nothing, EXCH registerThis registerSP)]
-                 ++ concatMap popParameter rs ++
+                 ++ invertInstructions (concatMap pushParameter rs) ++
                 [(Nothing, EXCH registerRO registerSP),
                  (Nothing, ADDI registerSP $ Immediate 1)]
        return $ mp ++ body' ++ [(Just lb, BRA lt)]
     where addParameters = mapM (pushRegister . (\(GDecl _ p) -> p)) ps
           clearParameters = replicateM_ (length ps) popRegister
-          popParameter r = [(Nothing, SUBI registerSP $ Immediate 1), (Nothing, EXCH r registerSP)]
           pushParameter r = [(Nothing, EXCH r registerSP), (Nothing, ADDI registerSP $ Immediate 1)]
 
 cgVirtualTables :: CodeGenerator [(Maybe Label, MInstruction)]
@@ -346,6 +355,31 @@ getMainClass = gets (mainClass . caState . saState) >>= \mc ->
         (Just tp) -> return tp
         Nothing -> throwError "ICE: No main method defined"
 
+getFields :: TypeName -> CodeGenerator [VariableDeclaration]
+getFields tp =
+    do cs <- gets (classes . caState . saState)
+       case lookup tp cs of
+           (Just (GCDecl _ _ fs _)) -> return fs
+           Nothing -> throwError $ "ICE: Unknown class " ++ tp
+
+cgOutput :: TypeName -> CodeGenerator ([(Maybe Label, MInstruction)], [(Maybe Label, MInstruction)])
+cgOutput tp =
+    do mfs <- getFields tp
+       co <- concat <$> mapM cgCopyOutput (zip [1..] $ reverse mfs)
+       return (map cgStatic mfs, co)
+    where cgStatic (GDecl _ n) = (Just $ "l_r_" ++ n, DATA $ Immediate 0)
+          cgCopyOutput(o, GDecl _ n) =
+              do rt <- tempRegister
+                 ra <- tempRegister
+                 popTempRegister >> popTempRegister
+                 let copy = [SUBI registerSP $ Immediate o,
+                             EXCH rt registerSP,
+                             XORI ra $ AddressMacro $ "l_r_" ++ n,
+                             EXCH rt ra,
+                             XORI ra $ AddressMacro $ "l_r_" ++ n,
+                             ADDI registerSP $ Immediate o]
+                 return $ zip (repeat Nothing) copy
+
 cgProgram :: SProgram -> CodeGenerator PISA.MProgram
 cgProgram p =
     do vt <- cgVirtualTables
@@ -354,6 +388,7 @@ cgProgram p =
        ms <- concat <$> mapM cgMethod p
        l_main <- getMainLabel
        mtp <- getMainClass
+       (out, co) <- cgOutput mtp
        let mvt = "l_" ++ mtp ++ "_vt"
            mn = [(Just "start", BRA "top"),
                  (Nothing, START),
@@ -366,15 +401,15 @@ cgProgram p =
                  (Nothing, ADDI registerSP $ Immediate 1),
                  (Nothing, BRA l_main),
                  (Nothing, SUBI registerSP $ Immediate 1),
-                 (Nothing, EXCH registerThis registerSP),
-                 --TODO: copy results to static storage
-                 (Nothing, SUBI registerSP $ SizeMacro mtp),
+                 (Nothing, EXCH registerThis registerSP)]
+                 ++ co ++
+                [(Nothing, SUBI registerSP $ SizeMacro mtp),
                  (Nothing, EXCH rv registerSP),
                  (Nothing, XORI rv $ AddressMacro mvt),
                  (Nothing, XOR registerThis registerSP),
                  (Nothing, SUBI registerSP ProgramSize),
                  (Just "finish", FINISH)]
-       return $ PISA.GProg $ [(Just "top", BRA "start")] ++ vt ++ ms ++ mn
+       return $ PISA.GProg $ [(Just "top", BRA "start")] ++ out ++ vt ++ ms ++ mn
 
 generatePISA :: (SProgram, SAState) -> Except String (PISA.MProgram, SAState)
 generatePISA (p, s) = second saState <$> runStateT (runCG $ cgProgram p) (initialState s)
