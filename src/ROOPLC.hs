@@ -1,4 +1,5 @@
 import Control.Monad.Except
+import System.IO
 
 import Parser
 import PISA
@@ -13,9 +14,7 @@ type Error = String
 main :: IO ()
 main =
     do input <- getContents
-       case compileProgram input of
-           Left err -> putStr $ err ++ "\n"
-           Right p -> putStr $ showProgram p
+       either (hPutStrLn stderr) (putStr . showProgram) (compileProgram input)
 
 compileProgram :: String -> Either Error Program
 compileProgram s =
