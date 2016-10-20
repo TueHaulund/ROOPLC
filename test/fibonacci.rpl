@@ -1,0 +1,31 @@
+class Program
+    int result
+    int n
+
+    method main()
+        n ^= 4
+
+        construct Fib f
+            //Compute-copy-uncompute
+            call f::fib(n)
+            call f::get(result)
+            uncall f::fib(n)
+        destruct f
+
+class Fib
+    int x1
+    int x2
+
+    method fib(int n)
+        if n = 0 then
+            x1 ^= 1
+            x2 ^= 1
+        else
+            n -= 1
+            call fib(n)
+            x1 += x2
+            x1 <=> x2
+        fi x1 = x2
+
+    method get(int out)
+        out ^= x2

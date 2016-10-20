@@ -1,0 +1,92 @@
+class Node //Represents a single node in the list
+    int data
+    Node next //Reference to next node in the list
+
+    //Constructor method
+    method constructor(int d, Node n)
+        data ^= d
+        next <=> n
+
+    //Accessor & mutator methods
+    method add(int out)
+        out += data
+
+    method sub(int out)
+        out -= data
+
+    method xor(int out)
+        out ^= data
+
+    method swap(int out)
+        out <=> data
+
+    method swapNext(Node out)
+        out <=> next
+
+class Iterator //Iterator interface
+    int result
+
+    //Abstract method
+    method run(Node head, Node next)
+        skip
+
+    //Accessor
+    method get(int out)
+        out <=> result
+
+class ListBuilder
+    int n //The length of the list to build
+    Iterator it //The iterator instance to run
+    Node empty //Helper node
+
+    //Constructor method
+    method constructor(int len, Iterator i)
+        n += len
+        it <=> i
+
+    method build(Node head)
+        if n = 0 then
+            if head != nil then
+                call it::run(head, empty) //List is done, run the iterator
+            else skip
+            fi head != nil
+        else
+            //Not yet done, construct next node
+            construct Node next
+                call next::constructor(n, head)
+                n -= 1
+                call build(next)
+                n += 1
+                uncall next::constructor(n, head)
+            destruct next
+        fi n = 0
+
+class Sum inherits Iterator
+    int sum
+
+    method run(Node head, Node next)
+        call head::add(sum)
+        call head::swapNext(next)
+        if next = nil then
+            result += sum //Finished
+        else
+            call run(next, head) //More work to do
+        fi next = nil
+        uncall head::swapNext(next) //Return list to original state
+        uncall head::add(sum)
+
+class Program
+    int result //Final result
+    Node empty //Helper node
+
+    method main()
+        local int n = 5 //List length
+        construct Sum it //Construct iterator
+            construct ListBuilder lb //Construct list builder
+                call lb::constructor(n, it)
+                call lb::build(empty) //Build & iterate
+                uncall lb::constructor(n, it)
+            destruct lb
+            call it::get(result) //Fetch result
+        destruct it
+        delocal n = 5
