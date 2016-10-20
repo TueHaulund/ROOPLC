@@ -66,7 +66,7 @@ type MInstruction = GInstr Macro
 type MProgram = GProg Macro
 
 invertInstructions :: [(Maybe Label, MInstruction)] -> [(Maybe Label, MInstruction)]
-invertInstructions = reverse . map (second invertInstruction)
+invertInstructions = reverse . map (second invertInstruction . first (fmap (++ "_i")))
     where invertInstruction (ADD r1 r2) = SUB r1 r2
           invertInstruction (SUB r1 r2) = ADD r1 r2
           invertInstruction (ADDI r i) = SUBI r i
@@ -75,6 +75,14 @@ invertInstructions = reverse . map (second invertInstruction)
           invertInstruction (RLV r1 r2) = RRV r1 r2
           invertInstruction (RR r i) = RL r i
           invertInstruction (RRV r1 r2) = RLV r1 r2
+          invertInstruction (BEQ r1 r2 l) = BEQ r1 r2 $ l ++ "_i"
+          invertInstruction (BGEZ r l) = BGEZ r $ l ++ "_i"
+          invertInstruction (BGTZ r l) = BGTZ r $ l ++ "_i"
+          invertInstruction (BLEZ r l) = BLEZ r $ l ++ "_i"
+          invertInstruction (BLTZ r l) = BLTZ r $ l ++ "_i"
+          invertInstruction (BNE r1 r2 l) = BNE r1 r2 $ l ++ "_i"
+          invertInstruction (BRA l) = BRA $ l ++ "_i"
+          invertInstruction (RBRA l) = RBRA $ l ++ "_i"
           invertInstruction inst = inst
 
 {-- Output PISA Definitions --}

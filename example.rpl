@@ -1,53 +1,41 @@
-class Foo
-    method run(int a)
-        skip
-
-class Bar inherits Foo
-    int b
-
-    method run(int a)
-        b += 6
-        a += b
-        b -= 6
-
-class Baz inherits Foo
-    int c
-
-    method run(int a)
-        c += 5
-        a -= c
-        c -= 5
-
-class Qux
-    method X()
-        skip
-
-    method Y()
-        skip
-
-    method wat(Foo f, int a)
-        uncall f::run(a)
-
 class Program
     int result
-    int test
-    int test2
-    int test3
+    int n
+    Node foo
+
+    method BuildList(Node head)
+        if n = 0 then
+            call head::sum(result)
+        else
+            construct Node next
+                call next::constructor(n, head)
+                n -= 1
+                call BuildList(next)
+                n += 1
+                uncall next::constructor(n, head)
+            destruct next
+        fi n = 0
 
     method main()
-        test += 7
-        test2 += 8
-        test3 += 9
-        construct Bar bar
-        construct Baz baz
-        construct Qux qux
-        call go(qux, bar)
-        call go(qux, baz)
-        destruct qux
-        destruct baz
-        destruct bar
+        n += 7
+        construct Node tail
+        foo <=> tail
+        call BuildList(tail)
+        foo <=> tail
+        destruct tail
 
-    method go(Qux q, Foo f)
-        result += 1
-        //call f::run(result)
-        call q::wat(f, result)
+class Node
+    int data
+    Node next
+
+    method constructor(int d, Node n)
+        next <=> n
+        data ^= d
+
+    method sum(int s)
+        s += data
+        if next = nil then
+            skip
+        else
+            call next::sum(s)
+        fi next = nil

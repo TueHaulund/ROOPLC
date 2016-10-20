@@ -1,7 +1,5 @@
 module AST where
 
-import Text.Show.Pretty
-
 {-- AST Primitives --}
 
 type TypeName = String
@@ -113,6 +111,3 @@ data Symbol = LocalVariable DataType Identifier
 
 type SymbolTable = [(SIdentifier, Symbol)]
 type Scope = [(Identifier, SIdentifier)]
-
-printAST :: (Show t) => t -> String
-printAST = ppShow
