@@ -24,3 +24,7 @@ On Windows:
 __NOTE__: Both PowerShell and cmd.exe will output UTF-16 LE w/ BOM by default, which is incompatible with PendVM.
 
 __NOTE__: PendVM only allocates 16 bytes for each instruction label, but ROOPLC does not limit itself to 16 characters per label.
+
+### PendVM
+
+I have rehosted PendVM [here on GitHub](https://github.com/TueHaulund/PendVM), this version has 32 bytes for instruction labels which should be plenty and it will also compile correctly on Windows with MinGW32.
