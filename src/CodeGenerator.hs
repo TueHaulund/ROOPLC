@@ -15,8 +15,6 @@ import ScopeAnalyzer
 
 {-# ANN module "HLint: ignore Reduce duplication" #-}
 
-type Size = Integer
-
 data CGState =
     CGState {
         labelIndex :: SIdentifier,
@@ -91,12 +89,6 @@ getUniqueLabel l =
     do i <- gets labelIndex
        modify $ \s -> s { labelIndex = 1 + i }
        return $ l ++ "_" ++ show i
-
-getClassSize :: TypeName -> CodeGenerator Size
-getClassSize tp = gets (classSize . caState . saState) >>= \cs ->
-    case lookup tp cs of
-        (Just s) -> return s
-        Nothing -> throwError $ "ICE: Unknown class " ++ tp
 
 loadVariableAddress :: SIdentifier -> CodeGenerator (Register, [(Maybe Label, MInstruction)], CodeGenerator ())
 loadVariableAddress n = gets (symbolTable . saState) >>= \st ->
@@ -275,11 +267,10 @@ cgObjectBlock tp n stmt =
        popTempRegister --rv
        stmt' <- concat <$> mapM cgStatement stmt
        popRegister --rn
-       cs <- getClassSize tp
        let create = [(Nothing, XOR rn registerSP),
                      (Nothing, XORI rv $ AddressMacro $ "l_" ++ tp ++ "_vt"),
                      (Nothing, EXCH rv registerSP),
-                     (Nothing, ADDI registerSP $ Immediate cs)]
+                     (Nothing, ADDI registerSP $ SizeMacro tp)]
        return $ create ++ stmt' ++ invertInstructions create
 
 cgLocalBlock :: SIdentifier -> SExpression -> [SStatement] -> SExpression -> CodeGenerator [(Maybe Label, MInstruction)]
