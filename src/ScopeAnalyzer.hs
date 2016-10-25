@@ -2,7 +2,6 @@
 
 module ScopeAnalyzer (scopeAnalysis, SAState(..)) where
 
-import Data.Function
 import Data.Maybe
 import Data.List
 
@@ -186,13 +185,18 @@ getMethodName i = gets symbolTable >>= \st ->
         (Just (Method _ m)) -> return (i, m)
         _ -> throwError $ "ICE: Invalid method index " ++ show i
 
+prefixVtable :: [(SIdentifier, MethodName)] -> (SIdentifier, MethodName) -> [(SIdentifier, MethodName)]
+prefixVtable [] m' = [m']
+prefixVtable (m:ms) m' = if comp m m' then m':ms else m : prefixVtable ms m'
+    where comp (_, n) (_, n') = n == n'
+
 saClass :: Offset -> [SIdentifier] -> ClassDeclaration -> ScopeAnalyzer [(TypeName, SMethodDeclaration)]
 saClass offset pids (GCDecl c _ fs ms) =
     do enterScope
        mapM_ insertClassField $ zip [offset..] fs
-       m1 <- mapM insertMethod ms
-       m2 <- mapM getMethodName pids
-       let m3 = map fst $ unionBy ((==) `on` snd) m1 m2
+       m1 <- mapM getMethodName pids
+       m2 <- mapM insertMethod ms
+       let m3 = map fst $ foldl prefixVtable m1 m2
            offset' = genericLength fs + offset
        modify $ \s -> s { virtualTables = (c, m3) : virtualTables s }
        sc <- getSubClasses c
