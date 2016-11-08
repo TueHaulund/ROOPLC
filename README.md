@@ -15,11 +15,11 @@ The compiler reads input from stdin until it reaches EOF, it then compiles the c
 
 On UNIX/Linux:
     
-    cat ./test/fibonacci.rpl | ./src/ROOPLC > ./test/fibonacci.pal
+    cat ./test/Fibonacci.rpl | ./src/ROOPLC > ./test/Fibonacci.pal
 
 On Windows:
 
-    type .\test\fibonacci.rpl | .\src\ROOPLC.exe > .\test\fibonacci.pal
+    type .\test\Fibonacci.rpl | .\src\ROOPLC.exe > .\test\Fibonacci.pal
 
 __NOTE__: Both PowerShell and cmd.exe will output UTF-16 LE w/ BOM by default, which is incompatible with PendVM.
 
